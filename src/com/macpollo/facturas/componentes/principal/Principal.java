@@ -29,15 +29,14 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.StringReader;
 import java.net.InetAddress;
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.List;
+import java.util.Enumeration;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 import java.util.zip.ZipInputStream;
 import javax.swing.JComponent;
 import javax.swing.JFileChooser;
@@ -433,40 +432,39 @@ public class Principal extends JFrame
      * @param rutaZip Ruta de la carpeta temporal para extraer los archivos.
      * @throws Exception Si se presenta algún error en el proceso.
      */
-    private void extraerArchivos(String rutaCar, String nombre, String rutaZip) throws Exception
-    {
-        try (FileInputStream fis = new FileInputStream(rutaCar + "/" + nombre);
-                ZipInputStream zis = new ZipInputStream(new BufferedInputStream(fis), Charset.forName("ISO-8859-1")))
-        {
-            new File(rutaZip + "/").mkdirs();
-
-            ZipEntry entry;
-            while((entry = zis.getNextEntry()) != null)
-            {
-                byte buffer[] = new byte[2048];
-                int bytesRead;
-
-                if (entry.isDirectory())
-                {
-                    new File(rutaZip + "/" + entry.getName()).mkdirs();
-                }
-                else
-                {
-                    FileOutputStream fos = new FileOutputStream(rutaZip + "/" + entry.getName());
-                    try (BufferedOutputStream bos = new BufferedOutputStream(fos, 2048))
-                    {
-                        while ((bytesRead = zis.read(buffer, 0, 2048)) != -1)
-                        {
-                            bos.write(buffer, 0, bytesRead);
-                        }
-
-                        bos.flush();
-                    }
-                }
+     private void extraerArchivos(String rutaCar, String nombre, String rutaZip) throws Exception {
+         //Open the file
+        try (ZipFile zip = new ZipFile(rutaCar + "/" + nombre)) {
+          //FileSystem fileSystem = FileSystems.getDefault();
+          Enumeration<? extends ZipEntry> entries = zip.entries();
+          //We will unzip files in this folder
+          new File(rutaZip + "/").mkdirs();
+          //Iterate over entries
+          while (entries.hasMoreElements()) {
+            ZipEntry entry = entries.nextElement();
+            File f = new File(rutaZip + "/" + entry.getName());
+            //If directory then create a new directory in uncompressed folder
+            if (entry.isDirectory()) {
+              if (!f.isDirectory() && !f.mkdirs()) {
+                throw new IOException("failed to create directory " + f);
+              }
             }
+            //Else create the file
+            else {
+              File parent = f.getParentFile();
+              if (!parent.isDirectory() && !parent.mkdirs()) {
+                throw new IOException("failed to create directory " + parent);
+              }
+              try(InputStream in = zip.getInputStream(entry)) {
+                  Files.copy(in, f.toPath());
+              }
+            }
+          }
+        } catch (IOException e) {
+          e.printStackTrace();
         }
-    }
-    
+     }
+
     /**
      * Valida los archivos {@code XML} y {@code PDF} que vengan los archivos que son
      * 
